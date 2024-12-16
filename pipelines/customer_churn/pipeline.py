@@ -146,7 +146,7 @@ def get_pipeline(
     )
     xgb_train.set_hyperparameters(
         objective="binary:logistic",
-        num_round=50,
+        num_round=10,
         max_depth=5,
         eta=0.2,
         gamma=4,
