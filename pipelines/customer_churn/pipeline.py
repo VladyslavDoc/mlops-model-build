@@ -102,7 +102,7 @@ def get_pipeline(
     )
     input_data = ParameterString(
         name="InputDataUrl",
-        default_value=f"s3://{sagemaker_session.default_bucket()}/sagemaker/DEMO-xgboost-churn/data/RawData.csv",  # Change this to point to the s3 location of your raw input data.
+        default_value="s3://ml-app-data/data/hf/train/adventure_w_queries_and_negatives.csv",  # Change this to point to the s3 location of your raw input data.
     )
 
     # Processing step for feature engineering
@@ -110,12 +110,12 @@ def get_pipeline(
         framework_version="0.23-1",
         instance_type=processing_instance_type,
         instance_count=processing_instance_count,
-        base_job_name=f"{base_job_prefix}/sklearn-CustomerChurn-preprocess",  # choose any name
+        base_job_name=f"{base_job_prefix}/sklearn-RecSys-preprocess",
         sagemaker_session=sagemaker_session,
         role=role,
     )
     step_process = ProcessingStep(
-        name="CustomerChurnProcess",  # choose any name
+        name="RecSysProcess",
         processor=sklearn_processor,
         outputs=[
             ProcessingOutput(output_name="train", source="/opt/ml/processing/train"),
@@ -126,129 +126,129 @@ def get_pipeline(
         job_arguments=["--input-data", input_data],
     )
 
-    # Training step for generating model artifacts
-    model_path = f"s3://{sagemaker_session.default_bucket()}/{base_job_prefix}/CustomerChurnTrain"
-    image_uri = sagemaker.image_uris.retrieve(
-        framework="xgboost",  # we are using the Sagemaker built in xgboost algorithm
-        region=region,
-        version="1.0-1",
-        py_version="py3",
-        instance_type=training_instance_type,
-    )
-    xgb_train = Estimator(
-        image_uri=image_uri,
-        instance_type=training_instance_type,
-        instance_count=1,
-        output_path=model_path,
-        base_job_name=f"{base_job_prefix}/CustomerChurn-train",
-        sagemaker_session=sagemaker_session,
-        role=role,
-    )
-    xgb_train.set_hyperparameters(
-        objective="binary:logistic",
-        num_round=10,
-        max_depth=5,
-        eta=0.2,
-        gamma=4,
-        min_child_weight=6,
-        subsample=0.7,
-        silent=0,
-    )
-    step_train = TrainingStep(
-        name="CustomerChurnTrain",
-        estimator=xgb_train,
-        inputs={
-            "train": TrainingInput(
-                s3_data=step_process.properties.ProcessingOutputConfig.Outputs[
-                    "train"
-                ].S3Output.S3Uri,
-                content_type="text/csv",
-            ),
-            "validation": TrainingInput(
-                s3_data=step_process.properties.ProcessingOutputConfig.Outputs[
-                    "validation"
-                ].S3Output.S3Uri,
-                content_type="text/csv",
-            ),
-        },
-    )
+    # # Training step for generating model artifacts
+    # model_path = f"s3://{sagemaker_session.default_bucket()}/{base_job_prefix}/CustomerChurnTrain"
+    # image_uri = sagemaker.image_uris.retrieve(
+    #     framework="xgboost",  # we are using the Sagemaker built in xgboost algorithm
+    #     region=region,
+    #     version="1.0-1",
+    #     py_version="py3",
+    #     instance_type=training_instance_type,
+    # )
+    # xgb_train = Estimator(
+    #     image_uri=image_uri,
+    #     instance_type=training_instance_type,
+    #     instance_count=1,
+    #     output_path=model_path,
+    #     base_job_name=f"{base_job_prefix}/CustomerChurn-train",
+    #     sagemaker_session=sagemaker_session,
+    #     role=role,
+    # )
+    # xgb_train.set_hyperparameters(
+    #     objective="binary:logistic",
+    #     num_round=10,
+    #     max_depth=5,
+    #     eta=0.2,
+    #     gamma=4,
+    #     min_child_weight=6,
+    #     subsample=0.7,
+    #     silent=0,
+    # )
+    # step_train = TrainingStep(
+    #     name="CustomerChurnTrain",
+    #     estimator=xgb_train,
+    #     inputs={
+    #         "train": TrainingInput(
+    #             s3_data=step_process.properties.ProcessingOutputConfig.Outputs[
+    #                 "train"
+    #             ].S3Output.S3Uri,
+    #             content_type="text/csv",
+    #         ),
+    #         "validation": TrainingInput(
+    #             s3_data=step_process.properties.ProcessingOutputConfig.Outputs[
+    #                 "validation"
+    #             ].S3Output.S3Uri,
+    #             content_type="text/csv",
+    #         ),
+    #     },
+    # )
 
-    # Processing step for evaluation
-    script_eval = ScriptProcessor(
-        image_uri=image_uri,
-        command=["python3"],
-        instance_type=processing_instance_type,
-        instance_count=1,
-        base_job_name=f"{base_job_prefix}/script-CustomerChurn-eval",
-        sagemaker_session=sagemaker_session,
-        role=role,
-    )
-    evaluation_report = PropertyFile(
-        name="EvaluationReport",
-        output_name="evaluation",
-        path="evaluation.json",
-    )
-    step_eval = ProcessingStep(
-        name="CustomerChurnEval",
-        processor=script_eval,
-        inputs=[
-            ProcessingInput(
-                source=step_train.properties.ModelArtifacts.S3ModelArtifacts,
-                destination="/opt/ml/processing/model",
-            ),
-            ProcessingInput(
-                source=step_process.properties.ProcessingOutputConfig.Outputs[
-                    "test"
-                ].S3Output.S3Uri,
-                destination="/opt/ml/processing/test",
-            ),
-        ],
-        outputs=[
-            ProcessingOutput(output_name="evaluation", source="/opt/ml/processing/evaluation"),
-        ],
-        code=os.path.join(BASE_DIR, "evaluate.py"),
-        property_files=[evaluation_report],
-    )
+    # # Processing step for evaluation
+    # script_eval = ScriptProcessor(
+    #     image_uri=image_uri,
+    #     command=["python3"],
+    #     instance_type=processing_instance_type,
+    #     instance_count=1,
+    #     base_job_name=f"{base_job_prefix}/script-CustomerChurn-eval",
+    #     sagemaker_session=sagemaker_session,
+    #     role=role,
+    # )
+    # evaluation_report = PropertyFile(
+    #     name="EvaluationReport",
+    #     output_name="evaluation",
+    #     path="evaluation.json",
+    # )
+    # step_eval = ProcessingStep(
+    #     name="CustomerChurnEval",
+    #     processor=script_eval,
+    #     inputs=[
+    #         ProcessingInput(
+    #             source=step_train.properties.ModelArtifacts.S3ModelArtifacts,
+    #             destination="/opt/ml/processing/model",
+    #         ),
+    #         ProcessingInput(
+    #             source=step_process.properties.ProcessingOutputConfig.Outputs[
+    #                 "test"
+    #             ].S3Output.S3Uri,
+    #             destination="/opt/ml/processing/test",
+    #         ),
+    #     ],
+    #     outputs=[
+    #         ProcessingOutput(output_name="evaluation", source="/opt/ml/processing/evaluation"),
+    #     ],
+    #     code=os.path.join(BASE_DIR, "evaluate.py"),
+    #     property_files=[evaluation_report],
+    # )
 
-    # Register model step that will be conditionally executed
-    model_metrics = ModelMetrics(
-        model_statistics=MetricsSource(
-            s3_uri="{}/evaluation.json".format(
-                step_eval.arguments["ProcessingOutputConfig"]["Outputs"][0]["S3Output"]["S3Uri"]
-            ),
-            content_type="application/json",
-        )
-    )
+    # # Register model step that will be conditionally executed
+    # model_metrics = ModelMetrics(
+    #     model_statistics=MetricsSource(
+    #         s3_uri="{}/evaluation.json".format(
+    #             step_eval.arguments["ProcessingOutputConfig"]["Outputs"][0]["S3Output"]["S3Uri"]
+    #         ),
+    #         content_type="application/json",
+    #     )
+    # )
 
-    # Register model step that will be conditionally executed
-    step_register = RegisterModel(
-        name="CustomerChurnRegisterModel",
-        estimator=xgb_train,
-        model_data=step_train.properties.ModelArtifacts.S3ModelArtifacts,
-        content_types=["text/csv"],
-        response_types=["text/csv"],
-        inference_instances=["ml.t2.medium", "ml.m5.large"],
-        transform_instances=["ml.m5.large"],
-        model_package_group_name=model_package_group_name,
-        approval_status=model_approval_status,
-        model_metrics=model_metrics,
-    )
+    # # Register model step that will be conditionally executed
+    # step_register = RegisterModel(
+    #     name="CustomerChurnRegisterModel",
+    #     estimator=xgb_train,
+    #     model_data=step_train.properties.ModelArtifacts.S3ModelArtifacts,
+    #     content_types=["text/csv"],
+    #     response_types=["text/csv"],
+    #     inference_instances=["ml.t2.medium", "ml.m5.large"],
+    #     transform_instances=["ml.m5.large"],
+    #     model_package_group_name=model_package_group_name,
+    #     approval_status=model_approval_status,
+    #     model_metrics=model_metrics,
+    # )
 
-    # Condition step for evaluating model quality and branching execution
-    cond_lte = ConditionGreaterThanOrEqualTo(  # You can change the condition here
-        left=JsonGet(
-            step_name=step_eval.name,
-            property_file=evaluation_report,
-            json_path="binary_classification_metrics.accuracy.value",  # This should follow the structure of your report_dict defined in the evaluate.py file.
-        ),
-        right=0.8,  # You can change the threshold here
-    )
-    step_cond = ConditionStep(
-        name="CustomerChurnAccuracyCond",
-        conditions=[cond_lte],
-        if_steps=[step_register],
-        else_steps=[],
-    )
+    # # Condition step for evaluating model quality and branching execution
+    # cond_lte = ConditionGreaterThanOrEqualTo(  # You can change the condition here
+    #     left=JsonGet(
+    #         step_name=step_eval.name,
+    #         property_file=evaluation_report,
+    #         json_path="binary_classification_metrics.accuracy.value",  # This should follow the structure of your report_dict defined in the evaluate.py file.
+    #     ),
+    #     right=0.8,  # You can change the threshold here
+    # )
+    # step_cond = ConditionStep(
+    #     name="CustomerChurnAccuracyCond",
+    #     conditions=[cond_lte],
+    #     if_steps=[step_register],
+    #     else_steps=[],
+    # )
 
     # Pipeline instance
     pipeline = Pipeline(
@@ -260,7 +260,7 @@ def get_pipeline(
             model_approval_status,
             input_data,
         ],
-        steps=[step_process, step_train, step_eval, step_cond],
+        steps=[step_process], #, step_train, step_eval, step_cond],
         sagemaker_session=sagemaker_session,
     )
     return pipeline

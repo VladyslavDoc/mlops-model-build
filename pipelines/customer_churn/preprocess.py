@@ -37,7 +37,7 @@ if __name__ == "__main__":
     key = "/".join(input_data.split("/")[3:])
 
     logger.info("Downloading data from bucket: %s, key: %s", bucket, key)
-    fn = f"{base_dir}/data/raw-data.csv"
+    fn = f"{base_dir}/data/hf/train/adventure_w_queries_and_negatives.csv"
     s3 = boto3.resource("s3")
     s3.Bucket(bucket).download_file(key, fn)
 
@@ -46,39 +46,38 @@ if __name__ == "__main__":
     # read in csv
     df = pd.read_csv(fn)
 
-    # drop the "Phone" feature column
-    df = df.drop(["Phone"], axis=1)
+    # Split dataset
+    # Select random 10% for validation and 10% for testing
 
-    # Change the data type of "Area Code"
-    df["Area Code"] = df["Area Code"].astype(object)
+    # Define the proportions for train, validation, and test
+    train_ratio = 0.8
+    val_ratio = 0.1
+    test_ratio = 0.1
 
-    # Drop several other columns
-    df = df.drop(["Day Charge", "Eve Charge", "Night Charge", "Intl Charge"], axis=1)
+    # Shuffle the DataFrame
+    df_shuffled = df.sample(frac=1, random_state=42).reset_index(drop=True)
 
-    # Convert categorical variables into dummy/indicator variables.
-    model_data = pd.get_dummies(df)
+    # Calculate the sizes of each subset
+    train_size = int(len(df) * train_ratio)
+    val_size = int(len(df) * val_ratio)
 
-    # Create one binary classification target column
-    model_data = pd.concat(
-        [
-            model_data["Churn?_True."],
-            model_data.drop(["Churn?_False.", "Churn?_True."], axis=1),
-        ],
-        axis=1,
-    )
+    # Split the DataFrame
+    train_df = df_shuffled[:train_size]
+    val_df = df_shuffled[train_size:train_size + val_size]
+    test_df = df_shuffled[train_size + val_size:]
 
-    # Split the data
-    train_data, validation_data, test_data = np.split(
-        model_data.sample(frac=1, random_state=1729),
-        [int(0.7 * len(model_data)), int(0.9 * len(model_data))],
-    )
+    # Check the sizes
+    print("Training set size:", len(train_df))
+    print("Validation set size:", len(val_df))
+    print("Testing set size:", len(test_df))
 
-    pd.DataFrame(train_data).to_csv(
+    train_df.to_csv(
         f"{base_dir}/train/train.csv", header=False, index=False
     )
-    pd.DataFrame(validation_data).to_csv(
+    val_df.to_csv(
         f"{base_dir}/validation/validation.csv", header=False, index=False
     )
-    pd.DataFrame(test_data).to_csv(
+    test_df.to_csv(
         f"{base_dir}/test/test.csv", header=False, index=False
     )
+    
